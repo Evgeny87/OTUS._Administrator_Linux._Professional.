@@ -16,3 +16,4 @@ sudo dpkg -i *.deb
 
 # Обновление загрузчика
 sudo update-grub
+sudo grub-set-default 0
