@@ -89,6 +89,7 @@ done
 
 ```bash
 sudo update-grub
+sudo grub-set-default 0
 sudo reboot
 ```
 
