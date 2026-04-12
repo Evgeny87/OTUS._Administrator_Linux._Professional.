@@ -17,7 +17,7 @@ done
 
 log "Creating RAID $RAID_DEV..."
 # Используем безопасную инициализацию с бэкапом метаданных
-mdadm --create --verbose "$RAID_DEV" --level="$LEVEL" --raid-devices="$COUNT" --backup-file="/tmp/raid_init.bak" $DISKS
+mdadm --create --run --verbose "$RAID_DEV" --level="$LEVEL" --raid-devices="$COUNT"  $DISKS
 
 log "Updating mdadm.conf..."
 mkdir -p /etc/mdadm
