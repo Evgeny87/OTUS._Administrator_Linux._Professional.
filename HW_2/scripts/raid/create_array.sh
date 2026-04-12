@@ -3,19 +3,31 @@ set -euo pipefail
 log() { logger -t RAID_DEPLOY "[CREATE] $1"; echo "$1"; }
 RAID_DEV=$1; LEVEL=$2; COUNT=$3; shift 3; DISKS=$@
 
-if grep -q "$(basename "$RAID_DEV")" /proc/mdstat; then log "[SKIP] $RAID_DEV active."; exit 0; fi
+# Проверка, не активен ли уже рейд
+if grep -q "$(basename "$RAID_DEV")" /proc/mdstat; then 
+    log "[SKIP] $RAID_DEV is already active."
+    exit 0 
+fi
 
-log "Final cleaning of $DISKS..."
+log "Cleaning metadata on $DISKS..."
 for disk in $DISKS; do
     wipefs -a "$disk"
-    mdadm --zero-superblock --force "$disk" || true
+    mdadm --zero-superblock --force "$disk"
 done
 
 log "Creating RAID $RAID_DEV..."
-# Убрали --backup-file и добавили --run для автозапуска
-mdadm --create --run --verbose "$RAID_DEV" --level="$LEVEL" --raid-devices="$COUNT" $DISKS
+# Используем безопасную инициализацию с бэкапом метаданных
+mdadm --create --verbose "$RAID_DEV" --level="$LEVEL" --raid-devices="$COUNT" --backup-file="/tmp/raid_init.bak" $DISKS
 
+log "Updating mdadm.conf..."
 mkdir -p /etc/mdadm
-mdadm --detail --scan --verbose | grep "ARRAY $RAID_DEV" >> /etc/mdadm/mdadm.conf || true
+# Формируем строку конфига
+CONF_LINE=$(mdadm --detail --scan --verbose | grep "ARRAY $RAID_DEV" || true)
 
+# Добавляем строку только если её там еще нет (Идемпотентность)
+if [[ -n "$CONF_LINE" ]]; then
+    grep -qxF "$CONF_LINE" /etc/mdadm/mdadm.conf || echo "$CONF_LINE" >> /etc/mdadm/mdadm.conf
+fi
+
+log "Updating initramfs..."
 if command -v update-initramfs &>/dev/null; then update-initramfs -u; fi
